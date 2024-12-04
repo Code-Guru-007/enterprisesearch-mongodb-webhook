@@ -1,5 +1,5 @@
 const { MongoClient } = require('mongodb');
-const client = require("./elasticsearch");
+const elastciSearchClient = require("./elasticsearch");
 const axios = require("axios");
 require("dotenv").config();
 
@@ -8,7 +8,7 @@ exports.mongodbConnectionListener = async () => {
         console.log("Starting MongoDB Connection Monitor...");
 
         // Step 1: Get all indices with the prefix "datasource_mongodb_connection_"
-        const indicesResponse = await client.cat.indices({ format: "json" });
+        const indicesResponse = await elastciSearchClient.cat.indices({ format: "json" });
         const indices = indicesResponse
             .map((index) => index.index)
             .filter((name) => name.startsWith("datasource_mongodb_connection_"));
@@ -23,7 +23,7 @@ exports.mongodbConnectionListener = async () => {
                 },
             };
 
-            const result = await client.search({
+            const result = await elastciSearchClient.search({
                 index,
                 body: query,
             });
@@ -103,7 +103,7 @@ exports.mongodbConnectionListener = async () => {
                         );
 
                         // Update the `updatedAt` field in ElasticSearch for tracking
-                        await client.update({
+                        await elastciSearchClient.update({
                             index,
                             id: configDoc._id,
                             body: {
