@@ -1,6 +1,7 @@
 const { MongoClient } = require('mongodb');
 const elastciSearchClient = require("./elasticsearch");
 const axios = require("axios");
+const processFieldContent = require("./mongodbwebhookServies").processFieldContent;
 require("dotenv").config();
 
 exports.mongodbConnectionListener = async () => {
@@ -33,6 +34,8 @@ exports.mongodbConnectionListener = async () => {
                     mongoUri,
                     database,
                     collection_name,
+                    field_name,
+                    field_type,
                     category,
                     coid,
                 } = configDoc._source;
@@ -60,15 +63,33 @@ exports.mongodbConnectionListener = async () => {
                     if (newDocuments.length > 0) {
                         console.log(`New documents detected:`, newDocuments);
 
-                        // Map documents to the required format
-                        const data = newDocuments.map((doc) => ({
-                            id: doc._id.toString(),
-                            title: doc.title,
-                            content: doc.content,
-                            description: doc.description,
-                            image: doc.image,
-                            category: category,
-                        }));
+                        const data = [];
+
+                        for (const document of newDocuments) {
+                            let processedContent;
+
+                            try {
+                                // Process the content based on field type
+                                processedContent = await processFieldContent(
+                                    document[field_name],
+                                    field_type
+                                );
+                            } catch (error) {
+                                console.error(`Failed to process content for row ID ${document._id}:`, error.message);
+                                continue;
+                            }
+
+                            if (processedContent) {
+                                data.push({
+                                    id: document._id.toString(),
+                                    content: processedContent,
+                                    title: `Row ID ${document._id}`, // Use provided title or fallback
+                                    description: "No description provided",
+                                    image: null,
+                                    category: category,
+                                });
+                            }
+                        }
 
                         const indexName = `tenant_${coid.toLowerCase()}`;
 
