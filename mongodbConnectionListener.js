@@ -63,7 +63,7 @@ exports.mongodbConnectionListener = async () => {
                     if (newDocuments.length > 0) {
                         console.log(`New documents detected:`, newDocuments);
 
-                        const data = [];
+                        let data = [];
 
                         for (const document of newDocuments) {
                             let processedContent;
