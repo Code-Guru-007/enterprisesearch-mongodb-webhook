@@ -77,8 +77,14 @@ exports.mongodbConnectionListener = async () => {
           await client.connect();
           const db = client.db(database);
 
+          console.log("Database Object: ", db);
+
+          if (!db) {
+            throw new Error(`Database "${database}" not found.`);
+          }
+
           if (field_type === "blob") {
-            const bucket = new GridFSBucket(database, {
+            const bucket = new GridFSBucket(db, {
               bucketName: collection_name,
             });
             console.log(
