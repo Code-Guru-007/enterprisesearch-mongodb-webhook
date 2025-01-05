@@ -134,9 +134,9 @@ exports.mongodbConnectionListener = async () => {
                     data.push({
                       id: `mongodb_${database}_${collection_name}_${file._id}_${index}`,
                       content: chunk,
-                      title: config.title || `MongoDB Row ID ${file._id}`,
-                      description: config.description || "No description",
-                      image: config.image || null,
+                      title: `MongoDB Row ID ${file._id}`,
+                      description: "No description",
+                      image: null,
                       category: category,
                       fileUrl: fileUrl,
                     });
