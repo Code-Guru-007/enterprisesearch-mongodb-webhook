@@ -76,12 +76,11 @@ exports.mongodbConnectionListener = async () => {
         try {
           await client.connect();
           const db = client.db(database);
-          const collection = db.collection(collection_name);
-          const bucket = new GridFSBucket(database, {
-            bucketName: collection_name,
-          });
 
           if (field_type === "blob") {
+            const bucket = new GridFSBucket(database, {
+              bucketName: collection_name,
+            });
             console.log(
               `Fetching new files from collection: ${collection_name}...`
             );
@@ -190,6 +189,7 @@ exports.mongodbConnectionListener = async () => {
               );
             }
           } else {
+            const collection = db.collection(collection_name);
             console.log(
               `Fetching new documents from collection: ${collection_name}...`
             );
