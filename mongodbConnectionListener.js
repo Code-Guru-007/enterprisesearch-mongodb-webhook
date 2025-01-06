@@ -129,6 +129,9 @@ exports.mongodbConnectionListener = async () => {
                 }
 
                 if (processedContent) {
+                  const fileSizeInMB = (file.length / (1024 * 1024)).toFixed(2); // Convert size to MB
+                  const uploadedAt = file.uploadDate || new Date(); // Fallback to current timestamp if missing
+
                   const chunks = splitLargeText(processedContent);
                   chunks.forEach((chunk, index) => {
                     data.push({
@@ -139,6 +142,8 @@ exports.mongodbConnectionListener = async () => {
                       image: null,
                       category: category,
                       fileUrl: fileUrl,
+                      fileSize: parseFloat(fileSizeInMB), // Add file size (in MB)
+                      uploadedAt: uploadedAt, // Add uploadedAt timestamp
                     });
                   });
                 }
@@ -156,6 +161,8 @@ exports.mongodbConnectionListener = async () => {
                   image: doc.image,
                   category: doc.category,
                   fileUrl: doc.fileUrl,
+                  fileSize: doc.fileSize,
+                  uploadedAt: doc.uploadedAt,
                 })),
               };
 
@@ -234,6 +241,8 @@ exports.mongodbConnectionListener = async () => {
                     image: null,
                     category: category,
                     fileUrl: "",
+                    fileSize: null, // Not applicable for non-GridFS documents
+                    uploadedAt: document.uploadDate || new Date(), // Use uploadDate or current time
                   });
                 }
               }
@@ -250,6 +259,8 @@ exports.mongodbConnectionListener = async () => {
                   image: doc.image,
                   category: doc.category,
                   fileUrl: doc.fileUrl,
+                  fileSize: doc.fileSize,
+                  uploadedAt: doc.uploadedAt,
                 })),
               };
 
