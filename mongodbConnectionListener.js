@@ -57,8 +57,7 @@ exports.mongodbConnectionListener = async () => {
           mongoUri,
           database,
           collection_name,
-          field_name,
-          field_type,
+          title_field,
           category,
           coid,
         } = configDoc._source;
@@ -83,29 +82,28 @@ exports.mongodbConnectionListener = async () => {
             throw new Error(`Database "${database}" not found.`);
           }
 
-          if (field_type === "blob") {
-            const bucket = new GridFSBucket(db, {
-              bucketName: collection_name,
-            });
-            console.log(
-              `Fetching new files from collection: ${collection_name}...`
-            );
+          const bucket = new GridFSBucket(db, {
+            bucketName: collection_name,
+          });
+          const collection = db.collection(collection_name);
+
+          // Detect whether the collection contains GridFS files or regular documents
+          const gridFsFiles = await bucket.find().limit(1).toArray();
+          const isGridFs = gridFsFiles.length > 0;
+
+          const data = [];
+
+          if (isGridFs) {
+            console.log("Detected GridFS collection. Processing files...");
             const files = await bucket.find().toArray();
-
             if (files.length > 0) {
-              console.log("New Files detected:");
-
-              const data = [];
-
               for (const file of files) {
                 let processedContent;
                 let fileUrl;
-
+                const downloadStream = bucket.openDownloadStream(file._id);
+                const buffer = await streamToBuffer(downloadStream);
+                const fileName = file[title_field];
                 try {
-                  const downloadStream = bucket.openDownloadStream(file._id);
-                  const buffer = await streamToBuffer(downloadStream);
-                  const fileName = `mongodb_${database}_${collection_name}_file_${file._id}`;
-
                   // Detect and process MIME Types
                   const { extractedText, mimeType } = await processBlobField(
                     buffer
@@ -137,7 +135,7 @@ exports.mongodbConnectionListener = async () => {
                     data.push({
                       id: `mongodb_${database}_${collection_name}_${file._id}_${index}`,
                       content: chunk,
-                      title: `MongoDB Row ID ${file._id}`,
+                      title: fileName,
                       description: "No description",
                       image: null,
                       category: category,
@@ -202,28 +200,39 @@ exports.mongodbConnectionListener = async () => {
               );
             }
           } else {
-            const collection = db.collection(collection_name);
             console.log(
-              `Fetching new documents from collection: ${collection_name}...`
+              "Detected regular documents collection. Processing documents..."
             );
-
-            // Step 4: Fetch all documents (or implement a custom filter if needed)
-            const newDocuments = await collection.find({}).toArray();
-
-            if (newDocuments.length > 0) {
-              console.log(`New documents detected:`, newDocuments);
-
-              const data = [];
-
-              for (const document of newDocuments) {
+            const documents = await collection.find({}).toArray();
+            if (documents.length > 0) {
+              for (const document of documents) {
                 let processedContent;
-
+                const fileName = document[title_field];
+                let fileUrl;
                 try {
-                  // Process the content based on field type
-                  processedContent = await processFieldContent(
-                    document[field_name],
-                    field_type
+                  // Process the content dynamically based on its structure
+                  if (
+                    typeof document === "string" ||
+                    typeof document === "number"
+                  ) {
+                    processedContent = document.toString();
+                  } else if (Buffer.isBuffer(document)) {
+                    const { extractedText } = await processBlobField(document);
+                    processedContent = extractedText;
+                  } else if (typeof document === "object") {
+                    processedContent = JSON.stringify(document, null, 2);
+                  } else {
+                    processedContent = document.toString();
+                  }
+
+                  // Upload to Azure Blob Storage
+                  const buffer = Buffer.from(processedContent, "utf-8");
+                  fileUrl = await uploadFileToBlob(
+                    buffer,
+                    `${fileName || "document"}.txt`,
+                    "text/plain"
                   );
+                  console.log("File URL => ", fileUrl);
                 } catch (error) {
                   console.error(
                     `Failed to process content for row ID ${document._id}:`,
@@ -236,11 +245,11 @@ exports.mongodbConnectionListener = async () => {
                   data.push({
                     id: document._id.toString(),
                     content: processedContent,
-                    title: `MongoDB Row ID ${document._id}`, // Use provided title or fallback
+                    title: fileName, // Use provided title or fallback
                     description: "No description provided",
                     image: null,
                     category: category,
-                    fileUrl: "",
+                    fileUrl: fileUrl,
                     fileSize: null, // Not applicable for non-GridFS documents
                     uploadedAt: document.uploadDate || new Date(), // Use uploadDate or current time
                   });
